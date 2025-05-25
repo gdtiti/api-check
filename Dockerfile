@@ -49,7 +49,7 @@ RUN chown -R appuser:appgroup /app && \
 # 运行时配置
 ENV NODE_ENV=production
 ENV PORT=13000
-ENV NODE_OPTIONS="--openssl-legacy-provider"  # 可选：兼容旧版 OpenSSL
+#ENV NODE_OPTIONS="--openssl-legacy-provider"  # 可选：兼容旧版 OpenSSL
 
 USER appuser
 EXPOSE 13000
