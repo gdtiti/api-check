@@ -9,12 +9,12 @@ RUN apk update && \
     apk add --no-cache \
     ca-certificates \
     tzdata \
-    ntpdate && \
+    openntpd && \
     # 设置时区
     cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
     echo "Asia/Shanghai" > /etc/timezone && \
     # 同步系统时间
-    ntpdate pool.ntp.org && \
+    ntpd -s -d && \
     # 更新CA证书
     update-ca-certificates && \
     # 清理缓存
@@ -32,7 +32,7 @@ WORKDIR /app
 # 复制依赖文件
 COPY package.json yarn.lock ./
 
-# 安装所有依赖，移除 --ignore-ssl 参数
+# 安装所有依赖
 RUN yarn install --network-timeout 1000000
 
 # 复制项目源代码
