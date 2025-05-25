@@ -4,11 +4,25 @@ FROM node:18-alpine AS base
 # 设置工作目录
 WORKDIR /app
 
-# 配置国内镜像源
-RUN npm config set registry https://registry.npmmirror.com/
+# 更新包索引并安装必要的依赖
+RUN apk update && \
+    apk add --no-cache \
+    ca-certificates \
+    tzdata \
+    ntpdate && \
+    # 设置时区
+    cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
+    echo "Asia/Shanghai" > /etc/timezone && \
+    # 同步系统时间
+    ntpdate pool.ntp.org && \
+    # 更新CA证书
+    update-ca-certificates && \
+    # 清理缓存
+    rm -rf /var/cache/apk/*
 
-# 安装必要的系统依赖（例如 CA 证书）
-RUN apk add --no-cache ca-certificates
+# 配置国内镜像源
+RUN npm config set registry https://registry.npmmirror.com/ && \
+    yarn config set registry https://registry.npmmirror.com/
 
 # 阶段2：构建应用程序
 FROM base AS builder
@@ -18,8 +32,8 @@ WORKDIR /app
 # 复制依赖文件
 COPY package.json yarn.lock ./
 
-# 安装所有依赖，包括开发依赖
-RUN yarn install --ignore-ssl
+# 安装所有依赖，移除 --ignore-ssl 参数
+RUN yarn install --network-timeout 1000000
 
 # 复制项目源代码
 COPY . .
