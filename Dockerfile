@@ -19,7 +19,7 @@ WORKDIR /app
 COPY package.json yarn.lock ./
 
 # 安装所有依赖，包括开发依赖
-RUN yarn install
+RUN yarn install --ignore-ssl
 
 # 复制项目源代码
 COPY . .
