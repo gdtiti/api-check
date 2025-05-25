@@ -8,13 +8,10 @@ WORKDIR /app
 RUN apk update && \
     apk add --no-cache \
     ca-certificates \
-    tzdata \
-    openntpd && \
+    tzdata && \
     # 设置时区
     cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
     echo "Asia/Shanghai" > /etc/timezone && \
-    # 同步系统时间
-    ntpd -s -d && \
     # 更新CA证书
     update-ca-certificates && \
     # 清理缓存
