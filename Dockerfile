@@ -18,8 +18,8 @@ RUN apk update && \
     rm -rf /var/cache/apk/*
 
 # 配置国内镜像源
-RUN npm config set registry https://registry.npmmirror.com/ && \
-    yarn config set registry https://registry.npmmirror.com/
+#RUN npm config set registry https://registry.npmmirror.com/ && \
+#    yarn config set registry https://registry.npmmirror.com/
 
 # 阶段2：构建应用程序
 FROM base AS builder
