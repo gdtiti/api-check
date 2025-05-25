@@ -1,82 +1,56 @@
-# 阶段1：基础镜像准备
-FROM node:18-alpine AS base
-
-# 设置工作目录
+# 阶段1：基础镜像准备（Node.js 20 + 最新 CA 证书）
+FROM node:20-alpine AS base
 WORKDIR /app
 
-# 更新系统包并安装必要依赖（保留证书更新，移除镜像源配置）
+# 系统依赖：仅保留必要的证书更新工具
 RUN apk update && \
-    apk add --no-cache \
-      ca-certificates \
-      tzdata && \
-    # 设置时区（可选，根据需求保留）
-    cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
-    echo "Asia/Shanghai" > /etc/timezone && \
-    # 更新CA证书（关键：确保SSL证书验证有效）
+    apk add --no-cache ca-certificates && \
     update-ca-certificates && \
-    # 清理缓存
     rm -rf /var/cache/apk/*
 
 # 阶段2：构建应用程序
 FROM base AS builder
-
 WORKDIR /app
 
-# 复制依赖描述文件
+# 复制依赖文件
 COPY package.json yarn.lock ./
 
-# 使用官方镜像源安装依赖（移除国内镜像配置）
-RUN yarn install --network-timeout 1000000
+# 使用官方镜像源安装依赖（Yarn 3+ 或 npm）
+# 方案1：使用 Yarn 3+（推荐，兼容性更好）
+RUN corepack enable && \
+    corepack prepare yarn@stable --activate && \
+    yarn install --network-timeout 1000000 --immutable
 
-# 复制项目源代码
+# # 方案2：改用 npm（若 Yarn 仍有问题）
+# RUN npm install --production --no-audit --network-timeout 1000000
+
 COPY . .
+RUN yarn build  # 或 npm run build
 
-# 执行构建（根据项目实际情况修改）
-RUN yarn build
+# 清理开发依赖
+RUN rm -rf node_modules && \
+    yarn install --production --prefer-offline --network-timeout 1000000  # 仅保留生产依赖
 
-# 删除开发阶段的 node_modules（减少镜像体积）
-RUN rm -rf node_modules
-
-# 设置生产环境变量
-ENV NODE_ENV=production
-
-# 安装生产依赖（可选：根据需要保留或移除 --ignore-scripts）
-RUN yarn install --production --prefer-offline --network-timeout 1000000
-
-# 清理Yarn缓存
-RUN yarn cache clean --all
-
-# 阶段3：构建最终生产镜像
-FROM node:18-alpine
-
-# 设置工作目录
+# 阶段3：最终生产镜像
+FROM node:20-alpine
 WORKDIR /app
 
-# 创建非root用户（安全最佳实践）
-RUN addgroup -S appgroup && \
-    adduser -S appuser -G appgroup
+# 创建非root用户
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
-# 复制构建好的应用文件（从builder阶段拷贝）
-COPY --from=builder /app/server.js /app/server.js
-COPY --from=builder /app/dist /app/dist
-COPY --from=builder /app/api /app/api
-COPY --from=builder /app/node_modules /app/node_modules
-COPY --from=builder /app/package.json /app/package.json
+# 复制构建结果
+COPY --from=builder /app .
 
-# 修改文件权限
-RUN chown -R appuser:appgroup /app
+# 权限设置
+RUN chown -R appuser:appgroup /app && \
+    chmod -R ug+rX /app && \
+    chmod +x /app/server.js
 
-# 设置运行时环境变量
+# 运行时配置
 ENV NODE_ENV=production
-ENV HOST=0.0.0.0
 ENV PORT=13000
-ENV NODE_OPTIONS="--dns-result-order=ipv4first --use-openssl-ca"
+ENV NODE_OPTIONS="--openssl-legacy-provider"  # 可选：兼容旧版 OpenSSL
 
-# 暴露端口
-EXPOSE 13000
-
-# 切换为非root用户运行
 USER appuser
-
-# 启动命令
+EXPOSE 13000
 CMD ["node", "server.js"]
